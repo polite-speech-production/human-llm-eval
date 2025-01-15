@@ -1,49 +1,588 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Simple Website</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      background-color: #f9f9f9;
-      color: #333;
-      margin: 0;
-      padding: 0;
+<html>
+  <head>
+    <title>Human-LLM evaluation</title>
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://script.google.com https://*.google.com"> -->
+    <script src="https://unpkg.com/jspsych@7.3.4"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.0/papaparse.min.js"></script>
+    <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-multi-choice@1.1.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.1.0"></script>
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <style>
+      .hearts-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+        margin: 8px 0;
+      }
+    
+      .heart {
+        position: relative;
+        width: 20px;
+        height: 18px;
+        display: inline-block;
+        margin: 0 2px;
+      }
+    
+      .heart:before,
+      .heart:after {
+        content: "";
+        position: absolute;
+        left: 10px;
+        top: 0;
+        width: 10px;
+        height: 16px;
+        border-radius: 10px 10px 0 0;
+        background-color: lightgray;
+        transform: rotate(-45deg);
+        transform-origin: 0 100%;
+      }
+    
+      .heart:after {
+        left: 0;
+        transform: rotate(45deg);
+        transform-origin: 100% 100%;
+      }
+    
+      .filled:before,
+      .filled:after {
+        background-color: red;
+      }
+
+      .jspsych-survey-text-question textarea {
+        font-size: 16px !important;
+        padding: 8px;
+      }
+
+      .jspsych-survey-multi-choice-option {
+  margin: 0 1em 0 0;
+}
+
+.jspsych-survey-multi-choice-horizontal .jspsych-survey-multi-choice-option {
+  display: inline-block;
+  margin: 0 1em 0 0;
+}
+
+.jspsych-survey-multi-choice-option input[type='radio'] {
+  margin-right: 0.5em;
+}
+/* Add this to your existing style section */
+.jspsych-survey-multi-choice-question {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.jspsych-survey-multi-choice-horizontal {
+  display: flex;
+  justify-content: center;
+  gap: 30px; /* This adds space between No and Yes */
+}
+
+/* Hide the asterisk but keep the field required */
+.jspsych-survey-multi-choice-question .required {
+  display: none;
+}
+    </style>
+  </head>
+  <body>
+    <p>Loading the experiment... Please wait.</p>
+  </body>
+  <script>
+    // Replace with your Google Apps Script web app URL
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwzOd8uqqQGju-NyGfbE0vyE2hleNXk_ruasGJSujJgIJMUQ4UQCx18npEPaVFYloe8/exec";
+
+    // Create list of CSV files
+    const csvFiles = Array.from({ length: 156}, (_, i) =>
+      `./data_for_human_llm_eval/human_llm_eval_scenario_${i}.csv`
+    );
+
+
+    function jsonp(url) {
+  console.log("Making JSONP request to:", url);
+  
+  return new Promise((resolve, reject) => {
+    const callbackName = 'jsonp_' + Date.now();
+    console.log("Created callback name:", callbackName);
+
+    window[callbackName] = function(data) {
+      console.log("Received JSONP response:", data);
+      delete window[callbackName];
+      document.head.removeChild(script);
+      resolve(data);
+    };
+
+    const script = document.createElement('script');
+    const fullUrl = `${url}${url.includes('?') ? '&' : '?'}callback=${callbackName}`;
+    script.src = fullUrl;
+    console.log("Full URL:", fullUrl);
+
+    script.onerror = (error) => {
+      console.error("Script load error:", error);
+      delete window[callbackName];
+      document.head.removeChild(script);
+      reject(new Error('Script load failed'));
+    };
+
+    document.head.appendChild(script);
+  });
+}
+
+async function getNextCSVFile() {
+  try {
+    // Check localStorage first
+    const storedCSV = localStorage.getItem('assignedCSV');
+    if (storedCSV) {
+      console.log("Using stored CSV:", storedCSV);
+      return storedCSV;
     }
-    header {
-      background-color: #4CAF50;
-      color: white;
-      padding: 1rem 0;
+
+    console.log("Requesting new CSV assignment...");
+    const response = await jsonp(GOOGLE_SCRIPT_URL);
+    console.log("JSONP response received:", response);
+
+    if (response && typeof response.index === 'number') {
+      const index = response.index % csvFiles.length;
+      const csvFile = csvFiles[index];
+      localStorage.setItem('assignedCSV', csvFile);
+      console.log("Assigned CSV:", csvFile);
+      return csvFile;
+    } else {
+      throw new Error('Invalid response format');
     }
-    main {
-      padding: 2rem;
+  } catch (error) {
+    console.error("Error in CSV assignment:", error);
+    // Fallback to timestamp-based assignment
+    const timestamp = Date.now();
+    const index = timestamp % csvFiles.length;
+    const csvFile = csvFiles[index];
+    localStorage.setItem('assignedCSV', csvFile);
+    console.log("Fallback CSV assigned:", csvFile);
+    return csvFile;
+  }
+}
+
+    async function fetchAndParseCSV(csvUrl) {
+      const response = await fetch(csvUrl);
+      const csvText = await response.text();
+      return new Promise((resolve) => {
+        Papa.parse(csvText, {
+          header: false,
+          skipEmptyLines: true,
+          complete: function(results) {
+            const scenarios = results.data.map(row => row[0]);
+            resolve(scenarios);
+          }
+        });
+      });
     }
-    footer {
-      background-color: #ddd;
-      color: #555;
-      padding: 1rem 0;
-      position: fixed;
-      bottom: 0;
-      width: 100%;
+
+    function renderHearts(rating) {
+      let heartsHTML = '<div class="hearts-container">';
+      for (let i = 0; i < 3; i++) {
+        heartsHTML += `<div class="heart ${i < rating ? 'filled' : ''}"></div>`;
+      }
+      heartsHTML += '</div>';
+      return heartsHTML;
     }
-    a {
-      color: #4CAF50;
-      text-decoration: none;
+
+    async function startExperiment() {
+      const selectedCSV = await getNextCSVFile();
+      console.log("Using CSV file:", selectedCSV);
+
+      const all_scenarios = await fetchAndParseCSV(selectedCSV);
+      // const shuffled_scenarios = all_scenarios.sort(() => Math.random() - 0.5);
+      const shuffled_scenarios = all_scenarios;
+
+    const jsPsych = initJsPsych({
+      show_progress_bar: true, // Enable the progress bar
+      auto_update_progress_bar: true, // Automatically update the progress bar as the experiment progresses
+      on_finish: function() {
+        console.log("Experiment finished");
+      }
+    });
+
+    const welcome_page = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `
+        <div style="max-width: 1000px; margin: 0 auto; text-align: left;">
+        <p style="text-align: center;"><b><i>Welcome to the experiment!</i></b></p>
+        <p>In this experiment, you will be given several scenarios and asked several questions about each scenario.</p>
+        <p>The experiment is expected to take about 7-8 minutes to complete, including the time it takes to read instructions and answer several warm-up questions.</p>
+        </div>
+        `,
+      choices: ['Begin Experiment']
+      };
+
+    const consent_page = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `
+          <div style="max-width: 1000px; margin: 0 auto; text-align: left;">
+              <h2 style="text-align: center;">Consent to Participate</h2>
+              
+              <p>By completing this study, you are participating in research being performed by cognitive scientists in the Stanford University Department of Psychology. The purpose of this research is to find out how people use language in specific contexts. You must be at least 18 years old to participate. There are neither specific benefits nor anticipated risks associated with participation in this study. Your participation in this study is completely voluntary and you can withdraw at any time by simply exiting the study. You may decline to answer any or all of the following questions. Choosing not to participate or withdrawing will result in no penalty. Your anonymity is assured; the researchers who have requested your participation will not receive any personal information about you, and any information you provide will not be shared in association with any personally identifying information.</p>
+
+              <p>If you have questions about this research, please contact the researchers by sending an email to <a href="mailto:hjzhao@cs.stanford.edu" style="color: blue;">hjzhao@cs.stanford.edu</a>. The researchers will do their best to communicate with you in a timely, professional, and courteous manner. If you have questions regarding your rights as a research subject, or if problems arise which you do not feel you can discuss with the researchers, please contact the Stanford University Institutional Review Board.</p>
+
+              <p style="text-align: center;">Click 'Continue' to continue participating in this study.</p>
+          </div>
+      `,
+      choices: ['Continue'],
+      button_html: '<button class="jspsych-btn" style="margin: 0 auto; display: block;">%choice%</button>'
+  };
+
+    const note_page = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+            <div style="max-width: 800px; margin: 0 auto; text-align: left;">
+                <p style="text-align: center;"><b><i>Important Notes</i></b></p>
+                
+                <p>Please be patient if the experiment loads slowly :)</p>
+
+                <p>Please read instruction on each page carefully before proceeding to the next page.</p>
+
+                <p>If you encounter any problems or errors, we recommend switching to incognito mode or opening it in another web browser.</p>
+
+                <p>If the problem or error still resists, please send us an email at <a href="mailto:hjzhao@cs.stanford.edu" style="color: blue;">hjzhao@cs.stanford.edu</a>, and we will make sure you are compensated for your time!</p>
+            </div>
+        `,
+        choices: ['Next']
+    };
+
+    const start_experiment_transition = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `
+          <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+              <p>Now let's get started! You will be given instructions of the experiment on the next page.</p>
+              <p>Click 'Start' when you're ready to begin.</p>
+          </div>
+      `,
+      choices: ['Start']  // Changed the button text to 'Start' instead of 'Next'
+     };
+
+const fullscreen_trial = {
+    type: jsPsychFullscreen,
+    fullscreen_mode: true,
+    message: `
+        <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+            <p><b>Full-Screen Mode Required</b></p>
+            <p>To ensure the best experience, this experiment will switch to full-screen mode.</p>
+            <p>Click "Continue" to proceed.</p>
+        </div>
+    `,
+    button_label: "Continue"
+};
+
+
+const instruction_page = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+        <div style="max-width: 900px; margin: 0 auto; text-align: left;">
+          <p style="text-align: center;"><b><i>Now let's get started!</i></b></p>
+          
+          <p>On the following pages, you will be presented with 5 different scenarios and for each scenario, you will be asked 5 simple preference questions.</p>
+          
+          <p>In each scenario, people's feelings are represented on a scale of 0 to 3 hearts:</p>
+          
+          <ul>
+              <li>0 hearts <span style="display: inline-block; vertical-align: middle;">${renderHearts(0)}</span> is the lowest rating</li>
+              <li>3 hearts <span style="display: inline-block; vertical-align: middle;">${renderHearts(3)}</span> is the highest rating</li>
+          </ul>
+          
+          <p>Please read the scenarios carefully and answer the questions honestly.</p>
+          
+          <p style="text-align: center; margin-top: 30px;">Click 'Next' to start the experiment.</p>
+        </div>
+    `,
+    choices: ['Next']
+};
+
+    const trials_1 = {
+      timeline: [{
+        type: jsPsychSurveyMultiChoice,
+        preamble: function() {
+          const data = jsPsych.timelineVariable('question');
+          const ratingMatch = data.prompt.match(/(\d) out of 3 hearts/);
+          const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
+          
+          return `<div style="text-align: left; max-width: 600px; margin: 0 auto;">
+            ${data.prompt.replace(/Scenario:/, '<b>Scenario:</b><br>')
+                        .replace(/Imagine that Tom saw a prsentation/, 'Imagine that Tom saw a prsentation.<br><br>')
+                        .replace(/Rating:/, '<br><br><b>Rating:</b><br>') 
+                        .replace(/\d out of 3 hearts/, `${rating} out of 3 hearts ${renderHearts(rating)}`)
+                        .replace(/Question:/, '<br><b>Question:</b><br>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND give accurate and informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to give as accurate and informative feedback as possible, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily give informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to share .*? honest thoughts, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/actually/, '<strong>actually</strong>')
+                        .replace(/(What would .*? be most likely to say\?)/, "<i>$1</i><br><br>")
+                        .replace(/B. /, "<br><strong>B. </strong>")
+                        .replace(/A. /, "<strong>A. </strong>")
+                        }
+                        
+          </div>`;
+        },
+        questions: [
+          {
+            prompt: "",
+            options: ["A", "B"],
+            required: true,
+            horizontal: true
+          }
+        ],
+        button_label: 'Next',
+
+        on_finish: function(data) {
+          data.response = data.response.Q0;
+          data.stimulus = jsPsych.timelineVariable('question').prompt;
+        }
+      }],
+      timeline_variables: shuffled_scenarios.slice(0, 5).map(scenario => ({
+        question: {
+            prompt: scenario
+        }
+    }))
+    };
+
+    const transition_page = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+        <div style="max-width: 1000px; margin: 50px auto; text-align: center; line-height: 1.6;">
+            <p style="font-size: 18px;">Now, Let's move to the next scenario</p>
+        </div>
+    `,
+    choices: ['Continue'],
+    // button_html: '<button class="jspsych-btn" style="margin: 20px auto; display: block; font-size: 16px; padding: 10px 20px;">%choice%</button>'
+};
+
+const trials_2 = {
+      timeline: [{
+        type: jsPsychSurveyMultiChoice,
+        preamble: function() {
+          const data = jsPsych.timelineVariable('question');
+          const ratingMatch = data.prompt.match(/(\d) out of 3 hearts/);
+          const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
+          
+          return `<div style="text-align: left; max-width: 600px; margin: 0 auto;">
+            ${data.prompt.replace(/Scenario:/, '<b>Scenario:</b><br>')
+                        .replace(/Imagine that Tom saw a prsentation/, 'Imagine that Tom saw a prsentation.<br><br>')
+                        .replace(/Rating:/, '<br><br><b>Rating:</b><br>') 
+                        .replace(/\d out of 3 hearts/, `${rating} out of 3 hearts ${renderHearts(rating)}`)
+                        .replace(/Question:/, '<br><b>Question:</b><br>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND give accurate and informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to give as accurate and informative feedback as possible, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily give informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to share .*? honest thoughts, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/actually/, '<strong>actually</strong>')
+                        .replace(/(What would .*? be most likely to say\?)/, "<i>$1</i><br><br>")
+                        .replace(/B. /, "<br><strong>B. </strong>")
+                        .replace(/A. /, "<strong>A. </strong>")
+                        }
+                        
+          </div>`;
+        },
+        questions: [
+          {
+            prompt: "",
+            options: ["A", "B"],
+            required: true,
+            horizontal: true
+          }
+        ],
+        button_label: 'Next',
+
+        on_finish: function(data) {
+          data.response = data.response.Q0;
+          data.stimulus = jsPsych.timelineVariable('question').prompt;
+        }
+      }],
+      timeline_variables: shuffled_scenarios.slice(5, 10).map(scenario => ({
+        question: {
+            prompt: scenario
+        }
+    }))
+    };
+
+    const trials_3 = {
+      timeline: [{
+        type: jsPsychSurveyMultiChoice,
+        preamble: function() {
+          const data = jsPsych.timelineVariable('question');
+          const ratingMatch = data.prompt.match(/(\d) out of 3 hearts/);
+          const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
+          
+          return `<div style="text-align: left; max-width: 600px; margin: 0 auto;">
+            ${data.prompt.replace(/Scenario:/, '<b>Scenario:</b><br>')
+                        .replace(/Imagine that Tom saw a prsentation/, 'Imagine that Tom saw a prsentation.<br><br>')
+                        .replace(/Rating:/, '<br><br><b>Rating:</b><br>') 
+                        .replace(/\d out of 3 hearts/, `${rating} out of 3 hearts ${renderHearts(rating)}`)
+                        .replace(/Question:/, '<br><b>Question:</b><br>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND give accurate and informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to give as accurate and informative feedback as possible, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily give informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to share .*? honest thoughts, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/actually/, '<strong>actually</strong>')
+                        .replace(/(What would .*? be most likely to say\?)/, "<i>$1</i><br><br>")
+                        .replace(/B. /, "<br><strong>B. </strong>")
+                        .replace(/A. /, "<strong>A. </strong>")
+                        }
+                        
+          </div>`;
+        },
+        questions: [
+          {
+            prompt: "",
+            options: ["A", "B"],
+            required: true,
+            horizontal: true
+          }
+        ],
+        button_label: 'Next',
+
+        on_finish: function(data) {
+          data.response = data.response.Q0;
+          data.stimulus = jsPsych.timelineVariable('question').prompt;
+        }
+      }],
+      timeline_variables: shuffled_scenarios.slice(10, 15).map(scenario => ({
+        question: {
+            prompt: scenario
+        }
+    }))
+    };
+
+    const trials_4 = {
+      timeline: [{
+        type: jsPsychSurveyMultiChoice,
+        preamble: function() {
+          const data = jsPsych.timelineVariable('question');
+          const ratingMatch = data.prompt.match(/(\d) out of 3 hearts/);
+          const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
+          
+          return `<div style="text-align: left; max-width: 600px; margin: 0 auto;">
+            ${data.prompt.replace(/Scenario:/, '<b>Scenario:</b><br>')
+                        .replace(/Imagine that Tom saw a prsentation/, 'Imagine that Tom saw a prsentation.<br><br>')
+                        .replace(/Rating:/, '<br><br><b>Rating:</b><br>') 
+                        .replace(/\d out of 3 hearts/, `${rating} out of 3 hearts ${renderHearts(rating)}`)
+                        .replace(/Question:/, '<br><b>Question:</b><br>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND give accurate and informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to give as accurate and informative feedback as possible, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily give informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to share .*? honest thoughts, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/actually/, '<strong>actually</strong>')
+                        .replace(/(What would .*? be most likely to say\?)/, "<i>$1</i><br><br>")
+                        .replace(/B. /, "<br><strong>B. </strong>")
+                        .replace(/A. /, "<strong>A. </strong>")
+                        }
+                        
+          </div>`;
+        },
+        questions: [
+          {
+            prompt: "",
+            options: ["A", "B"],
+            required: true,
+            horizontal: true
+          }
+        ],
+        button_label: 'Next',
+
+        on_finish: function(data) {
+          data.response = data.response.Q0;
+          data.stimulus = jsPsych.timelineVariable('question').prompt;
+        }
+      }],
+      timeline_variables: shuffled_scenarios.slice(15, 20).map(scenario => ({
+        question: {
+            prompt: scenario
+        }
+    }))
+    };
+
+    const feedback_page = {
+    type: jsPsychSurveyText,
+    questions: [
+        {
+            prompt: "Did you experience any difficulties while completing this survey?",
+            placeholder: "If not, please type 'N/A'.",
+            rows: 3,
+            columns: 50,
+            required: false
+        },
+        {
+            prompt: "Please feel free to provide any additional feedback or comments.",
+            placeholder: "If not, please type 'N/A'.",
+            rows: 3,
+            columns: 50,
+            required: false
+        }
+    ],
+    button_label: "Submit Feedback"
+};
+
+      const save_data = {
+        type: jsPsychPipe,
+        action: "save",
+        experiment_id: "aL3zMZjs7BO6", // Replace with your experiment ID
+        filename: (() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const prolificID = urlParams.get("PROLIFIC_PID");
+        const uniqueSuffix = new Date().toISOString().replace(/[:.-]/g, "_"); // Add timestamp
+        const csvFileName = selectedCSV.split('/').pop().replace('.csv', ''); // Extract base name of CSV file
+
+        return prolificID
+            ? `participant_${prolificID}_${csvFileName}_${uniqueSuffix}.csv`
+            : `participant_${jsPsych.randomization.randomID(10)}_${csvFileName}_${uniqueSuffix}.csv`;
+    })(),
+        data_string: () => jsPsych.data.get().csv()
+      };
+
+      const thank_you_page = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+          <p>Thank you for participating in this experiment!</p>
+          <p>We appreciate your help, and your responses have been successfully recorded.</p>
+          <p>You may now close this window.</p>
+        `,
+        choices: ['Finish'],
+        on_finish: function() {
+          alert("You can now close this window.");
+        }
+      };
+
+      const timeline = [];
+      timeline.push(welcome_page);
+      timeline.push(consent_page);
+      timeline.push(note_page);
+      // timeline.push(fullscreen_trial);
+      timeline.push(instruction_page);
+      timeline.push(trials_1);
+      timeline.push(transition_page);
+      timeline.push(trials_2);
+      timeline.push(transition_page);
+      timeline.push(trials_3);
+      timeline.push(transition_page);
+      timeline.push(trials_4);
+      timeline.push(feedback_page);
+      timeline.push(save_data);
+      timeline.push(thank_you_page);
+
+      jsPsych.run(timeline);
     }
-    a:hover {
-      text-decoration: underline;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Welcome to My Website</h1>
-  </header>
-  <main>
-    <p>Hello, world! This is for testing purpose</p>
-  </main>
-</body>
+
+    startExperiment();
+  </script>
 </html>
