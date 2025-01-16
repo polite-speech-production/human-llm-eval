@@ -99,8 +99,8 @@
 
     // Create list of CSV files
     const csvFiles = Array.from({ length: 156}, (_, i) =>
-      `https://polite-speech-production.github.io/human-llm-eval/eval_data/human_llm_eval_scenario_${i}.csv`
-);
+      `./eval_data/human_llm_eval_scenario_${i}.csv`
+    );
 
 
     function jsonp(url) {
@@ -254,16 +254,6 @@ async function getNextCSVFile() {
         choices: ['Next']
     };
 
-    const start_experiment_transition = {
-      type: jsPsychHtmlButtonResponse,
-      stimulus: `
-          <div style="max-width: 800px; margin: 0 auto; text-align: center;">
-              <p>Now let's get started! You will be given instructions of the experiment on the next page.</p>
-              <p>Click 'Start' when you're ready to begin.</p>
-          </div>
-      `,
-      choices: ['Start']  // Changed the button text to 'Start' instead of 'Next'
-     };
 
 const fullscreen_trial = {
     type: jsPsychFullscreen,
@@ -302,7 +292,62 @@ const instruction_page = {
     choices: ['Next']
 };
 
-    const trials_1 = {
+const transition_page_warm_up = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+        <div style="max-width: 1000px; margin: 50px auto; text-align: left; line-height: 1.6;">
+            <p style="font-size: 18px;">Before we jump into the main study, we'll start with 5 warm-up questions.</p>
+            <p style="font-size: 18px;">For the first three questions, please <strong>simply match</strong> the visual-heart rating <strong>with</strong> the corresponding textual rating from one of the four options.</p>
+            <p style="font-size: 18px;">For the last two questions, please pick one of the two given options that best fits the scenario.</p>
+            <p style="font-size: 18px;">Click 'Continue' to start the warm-up questions.</p>
+        </div>
+    `,
+    choices: ['Continue'],
+    // button_html: '<button class="jspsych-btn" style="margin: 20px auto; display: block; font-size: 16px; padding: 10px 20px;">%choice%</button>'
+};
+
+const warmup_trials_1 = {
+  timeline: [{
+    type: jsPsychSurveyMultiChoice,
+    preamble: function() {
+      const data = jsPsych.timelineVariable('question');
+      const ratingMatch = data.prompt.match(/(\d) out of 3 hearts/);
+      const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
+      
+      return `<div style="text-align: center; max-width: 600px; margin: 0 auto;">
+        ${data.prompt.replace(/Imagine that Tom saw a presentation/, 'Imagine that Tom saw a presentation.<br><br>')
+                     .replace(/\d out of 3 hearts/, renderHearts(rating)+"<br>")
+                     .replace(/What did Tom feel\?/, "What did Tom feel?<br>")
+                     .replace(/A. 0 hearts/, '<strong>A.</strong> 0 hearts<br>')
+                     .replace(/B. 1 heart /, '<strong>B.</strong> 1 heart <br>')
+                     .replace(/C. 2 hearts/, '<strong>C.</strong> 2 hearts<br>')
+                     .replace(/D. 3 hearts/, '<strong>D.</strong> 3 hearts')
+                    }
+      </div>`;
+    },
+    questions: [
+      {
+        prompt: "",
+        options: ["A", "B", "C", "D"],
+        required: true,
+        horizontal: true
+      }
+    ],
+    button_label: 'Next',
+
+    on_finish: function(data) {
+      data.response = data.response.Q0;
+      data.stimulus = jsPsych.timelineVariable('question').prompt;
+    }
+  }],
+  timeline_variables: shuffled_scenarios.slice(0, 3).map(scenario => ({
+    question: {
+      prompt: scenario
+    }
+  }))
+};
+
+const warmup_trials_2 = {
       timeline: [{
         type: jsPsychSurveyMultiChoice,
         preamble: function() {
@@ -345,25 +390,29 @@ const instruction_page = {
           data.stimulus = jsPsych.timelineVariable('question').prompt;
         }
       }],
-      timeline_variables: shuffled_scenarios.slice(0, 5).map(scenario => ({
+      timeline_variables: shuffled_scenarios.slice(3, 5).map(scenario => ({
         question: {
             prompt: scenario
         }
     }))
     };
 
-    const transition_page = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: `
-        <div style="max-width: 1000px; margin: 50px auto; text-align: center; line-height: 1.6;">
-            <p style="font-size: 18px;">Now, Let's move to the next scenario</p>
-        </div>
-    `,
-    choices: ['Continue'],
-    // button_html: '<button class="jspsych-btn" style="margin: 20px auto; display: block; font-size: 16px; padding: 10px 20px;">%choice%</button>'
-};
+    const main_study_transition = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+            <div style="max-width: 1200px; margin: 0 auto; text-align: left;">
+                <p>Great! Now let's begin the main study! </p>
+                <p>You will read 4 different scenarios and be asked 5 questions about each of them. </p>
+                <p><>Please read the scenario carefully, <strong>especially the bold text in the question.</strong></p>
+                <p>Please think carefully with your responses, you won't be able to go back to your previous questions.</p>
+                <p>Click 'Next' to continue.</p>
+            </div>
+        `,
+        choices: ['Next']
+    };
 
-const trials_2 = {
+
+    const trials_1 = {
       timeline: [{
         type: jsPsychSurveyMultiChoice,
         preamble: function() {
@@ -413,7 +462,18 @@ const trials_2 = {
     }))
     };
 
-    const trials_3 = {
+    const transition_page = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+        <div style="max-width: 1000px; margin: 50px auto; text-align: center; line-height: 1.6;">
+            <p style="font-size: 18px;"><b><i>Now, Let's move to the next scenario</i></b></p>
+        </div>
+    `,
+    choices: ['Continue'],
+    // button_html: '<button class="jspsych-btn" style="margin: 20px auto; display: block; font-size: 16px; padding: 10px 20px;">%choice%</button>'
+};
+
+const trials_2 = {
       timeline: [{
         type: jsPsychSurveyMultiChoice,
         preamble: function() {
@@ -463,7 +523,7 @@ const trials_2 = {
     }))
     };
 
-    const trials_4 = {
+    const trials_3 = {
       timeline: [{
         type: jsPsychSurveyMultiChoice,
         preamble: function() {
@@ -507,6 +567,56 @@ const trials_2 = {
         }
       }],
       timeline_variables: shuffled_scenarios.slice(15, 20).map(scenario => ({
+        question: {
+            prompt: scenario
+        }
+    }))
+    };
+
+    const trials_4 = {
+      timeline: [{
+        type: jsPsychSurveyMultiChoice,
+        preamble: function() {
+          const data = jsPsych.timelineVariable('question');
+          const ratingMatch = data.prompt.match(/(\d) out of 3 hearts/);
+          const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
+          
+          return `<div style="text-align: left; max-width: 600px; margin: 0 auto;">
+            ${data.prompt.replace(/Scenario:/, '<b>Scenario:</b><br>')
+                        .replace(/Imagine that Tom saw a prsentation/, 'Imagine that Tom saw a prsentation.<br><br>')
+                        .replace(/Rating:/, '<br><br><b>Rating:</b><br>') 
+                        .replace(/\d out of 3 hearts/, `${rating} out of 3 hearts ${renderHearts(rating)}`)
+                        .replace(/Question:/, '<br><b>Question:</b><br>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND give accurate and informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to give as accurate and informative feedback as possible, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily give informative feedback,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to BOTH make .*? feel good AND share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to share .*? honest thoughts, but not necessarily make .*? feel good,)/, '<strong>$1</strong>')
+                        .replace(/(If .*? wanted to make .*? feel good, but not necessarily share .*? honest thoughts,)/, '<strong>$1</strong>')
+                        .replace(/actually/, '<strong>actually</strong>')
+                        .replace(/(What would .*? be most likely to say\?)/, "<i>$1</i><br><br>")
+                        .replace(/B. /, "<br><strong>B. </strong>")
+                        .replace(/A. /, "<strong>A. </strong>")
+                        }
+                        
+          </div>`;
+        },
+        questions: [
+          {
+            prompt: "",
+            options: ["A", "B"],
+            required: true,
+            horizontal: true
+          }
+        ],
+        button_label: 'Next',
+
+        on_finish: function(data) {
+          data.response = data.response.Q0;
+          data.stimulus = jsPsych.timelineVariable('question').prompt;
+        }
+      }],
+      timeline_variables: shuffled_scenarios.slice(20, 25).map(scenario => ({
         question: {
             prompt: scenario
         }
@@ -568,8 +678,12 @@ const trials_2 = {
       timeline.push(welcome_page);
       timeline.push(consent_page);
       timeline.push(note_page);
-      // timeline.push(fullscreen_trial);
+      timeline.push(fullscreen_trial);
       timeline.push(instruction_page);
+      timeline.push(transition_page_warm_up);
+      timeline.push(warmup_trials_1);
+      timeline.push(warmup_trials_2);
+      timeline.push(main_study_transition);
       timeline.push(trials_1);
       timeline.push(transition_page);
       timeline.push(trials_2);
