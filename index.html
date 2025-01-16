@@ -94,43 +94,43 @@
   </body>
   <script>
     // Replace with your Google Apps Script web app URL
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUnNu0r-yClShmOG5nWEdt-x3tPWwvZEqInfvSATwSmxXvSxNHQInp_KxSdTNuyqVH/exec";
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwzOd8uqqQGju-NyGfbE0vyE2hleNXk_ruasGJSujJgIJMUQ4UQCx18npEPaVFYloe8/exec";
 
     // Create list of CSV files
     const csvFiles = Array.from({ length: 156}, (_, i) =>
-      `https://polite-speech-production.github.io/human-llm-eval/data_for_human_llm_eval/human_llm_eval_scenario_${i}.csv`
+      `./data_for_human_llm_eval/human_llm_eval_scenario_${i}.csv`
     );
 
 
     function jsonp(url) {
-  console.log("Making JSONP request to:", url);
-  
-  return new Promise((resolve, reject) => {
-    const callbackName = 'jsonp_' + Date.now();
-    console.log("Created callback name:", callbackName);
+      console.log("Making JSONP request to:", url);
+      
+      return new Promise((resolve, reject) => {
+        const callbackName = 'jsonp_' + Date.now();
+        console.log("Created callback name:", callbackName);
 
-    window[callbackName] = function(data) {
-      console.log("Received JSONP response:", data);
-      delete window[callbackName];
-      document.head.removeChild(script);
-      resolve(data);
-    };
+        window[callbackName] = function(data) {
+          console.log("Received JSONP response:", data);
+          delete window[callbackName];
+          document.head.removeChild(script);
+          resolve(data);
+        };
 
-    const script = document.createElement('script');
-    const fullUrl = `${url}${url.includes('?') ? '&' : '?'}callback=${callbackName}`;
-    script.src = fullUrl;
-    console.log("Full URL:", fullUrl);
+        const script = document.createElement('script');
+        const fullUrl = `${url}${url.includes('?') ? '&' : '?'}callback=${callbackName}`;
+        script.src = fullUrl;
+        console.log("Full URL:", fullUrl);
 
-    script.onerror = (error) => {
-      console.error("Script load error:", error);
-      delete window[callbackName];
-      document.head.removeChild(script);
-      reject(new Error('Script load failed'));
-    };
+        script.onerror = (error) => {
+          console.error("Script load error:", error);
+          delete window[callbackName];
+          document.head.removeChild(script);
+          reject(new Error('Script load failed'));
+        };
 
-    document.head.appendChild(script);
-  });
-}
+        document.head.appendChild(script);
+      });
+    }
 
 async function getNextCSVFile() {
   try {
